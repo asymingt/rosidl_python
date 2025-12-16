@@ -126,7 +126,7 @@ def generate_py(generator_arguments_file, typesupport_impls):
                 convert_camel_case_to_lower_case_underscore(idl_stem)
         # sorting after lower case conversion to get true order
         for module_name, idl_stem in sorted((value, key) for (key, value) in module_names.items()):
-            module_init_path = os.path.join(args['output_dir'], subfolder, f'{module_names[idl_stem]}-__init__.py')
+            module_init_path = os.path.join(args['output_dir'], subfolder, f'{module_names[idl_stem]}.__init__.py')
             print(module_init_path)
             with open(os.path.join(module_init_path), 'w') as f:
 

@@ -29,7 +29,7 @@ def _py_aspect_impl(target, ctx):
 
     # Generate the Python bindings - this proces two files (a .py and a .c source file). The
     # .c source file is a python extension which is called by the .py file.
-    py_files, srcs, _ = generate_sources(
+    py_files, srcs, include_dirs = generate_sources(
         target = target,
         ctx = ctx,
         executable = ctx.executable._py_generator,
@@ -37,7 +37,7 @@ def _py_aspect_impl(target, ctx):
         input_idls = input_idls,
         input_type_descriptions = input_type_descriptions,
         input_templates = ctx.attr._py_templates[DefaultInfo].files.to_list(),
-        templates_hdrs = ["_{}.py", "_{}-__init__.py"],
+        templates_hdrs = ["_{}.py", "_{}.__init__.py"],
         templates_srcs = ["_{}_s.c"],
         additional = ["--typesupport-impls=rosidl_typesupport_c"],
     )

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@rosidl_adapter//:aspects.bzl", "idl_aspect")
 load("@rosidl_adapter//:tools.bzl", "generate_cc_info", "generate_linking_outputs", "generate_sources")
 load("@rosidl_adapter//:types.bzl", "RosIdlInfo")
@@ -29,7 +30,7 @@ def _py_aspect_impl(target, ctx):
 
     # Generate the Python bindings - this proces two files (a .py and a .c source file). The
     # .c source file is a python extension which is called by the .py file.
-    py_files, srcs, include_dirs = generate_sources(
+    py_files, srcs, _ = generate_sources(
         target = target,
         ctx = ctx,
         executable = ctx.executable._py_generator,
@@ -80,37 +81,39 @@ def _py_aspect_impl(target, ctx):
     # available in the runfiles folder, so that it can be dynamically loaded.
     dynamic_library = linking_outputs.library_to_link.dynamic_library
 
-    # Relative paths to the generated python interface and init files. We must add
-    # these, so that the rule can symlink runfiles to the correct locations.
-    py_interface_path = "{}/{}/_{}.py".format(
-        target[RosIdlInfo].package_name,
-        target[RosIdlInfo].interface_type,
-        target[RosIdlInfo].interface_code,
-    )
-    py_init_path = "{}/{}/__init__.py".format(
-        target[RosIdlInfo].package_name,
-        target[RosIdlInfo].interface_type
+    # We need the import path relative to the runfiles root.
+    import_path = paths.join(
+        target.label.workspace_root.removeprefix("external/"),
+        target.label.package,
     )
 
     # Return the depset of python interfaces and extension modules. These will be
     # aggregated by the rule and placed in the runfile path as needed.
     return [
         RosPyBindingsInfo(
-            py_interfaces = depset(
-                direct = [(py_interface_path, py_interface_file)],
+            transitive_sources = depset(
+                direct = [py_interface_file],
                 transitive = [
-                    dep[RosPyBindingsInfo].py_interfaces
+                    dep[RosPyBindingsInfo].transitive_sources
                     for dep in ctx.rule.attr.deps
                     if RosPyBindingsInfo in dep
+                ] + [
+                    dep[PyInfo].transitive_sources
+                    for dep in ctx.attr._py_deps
+                    if PyInfo in dep
                 ]
             ),
-            py_inits = depset(
-                direct = [(py_init_path, py_init_file)],
+            imports = depset(
+                direct = [import_path],
                 transitive = [
-                    dep[RosPyBindingsInfo].py_inits
+                    dep[RosPyBindingsInfo].imports
                     for dep in ctx.rule.attr.deps
                     if RosPyBindingsInfo in dep
-                ],
+                ] + [
+                    dep[PyInfo].imports
+                    for dep in ctx.attr._py_deps
+                    if PyInfo in dep
+                ]
             ),
             dynamic_libraries = depset(
                 direct = [dynamic_library],
@@ -150,6 +153,12 @@ py_aspect = aspect(
                 Label("@rosidl_runtime_c"),
             ],
             providers = [CcInfo],
+        ),
+        "_py_deps": attr.label_list(
+            default = [
+                Label("@rosidl_parser"),
+            ],
+            providers = [PyInfo],
         ),
     },
     required_providers = [RosInterfaceInfo],

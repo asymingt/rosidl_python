@@ -24,6 +24,12 @@ filegroup(
 )
 
 py_library(
+    name = "hook",
+    srcs = ["sitecustomize.py"],
+    imports = ["."],
+)
+
+py_library(
     name = "rosidl_generator_py",
     srcs = glob(["rosidl_generator_py/**/*.py"]),
     deps = [

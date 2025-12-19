@@ -157,6 +157,7 @@ py_aspect = aspect(
         "_py_deps": attr.label_list(
             default = [
                 Label("@rosidl_parser"),
+                Label("@rosidl_generator_py//:hook"),
             ],
             providers = [PyInfo],
         ),

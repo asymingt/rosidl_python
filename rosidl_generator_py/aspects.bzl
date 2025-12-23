@@ -17,30 +17,30 @@ load("@rosidl_adapter//:aspects.bzl", "idl_aspect")
 load("@rosidl_adapter//:tools.bzl", "generate_cc_info", "generate_linking_outputs", "generate_sources")
 load("@rosidl_adapter//:types.bzl", "RosIdlInfo")
 load("@rosidl_cmake//:types.bzl", "RosInterfaceInfo")
-load("@rosidl_generator_c//:aspects.bzl", "c_aspect")
-load("@rosidl_generator_c//:types.bzl", "RosCBindingsInfo")
+load("@rosidl_typesupport_c//:types.bzl", "RosCTypesupportInfo")
 load("@rosidl_generator_type_description//:aspects.bzl", "type_description_aspect")
 load("@rosidl_generator_type_description//:types.bzl", "RosTypeDescriptionInfo")
 load("@rules_python//python:defs.bzl", "PyInfo")
 load(":types.bzl", "RosPyBindingsInfo")
 
 def _py_aspect_impl(target, ctx):
-    input_idls = target[RosIdlInfo].idls.to_list()
-    input_type_descriptions = target[RosTypeDescriptionInfo].jsons.to_list()
+    input_idls = target[RosIdlInfo].idls.to_list()[-1]
+    input_type_descriptions = target[RosTypeDescriptionInfo].jsons.to_list()[-1]
 
     # Generate the Python bindings - this proces two files (a .py and a .c source file). The
     # .c source file is a python extension which is called by the .py file.
-    py_files, srcs, _ = generate_sources(
+    py_files, cc_srcs, _ = generate_sources(
         target = target,
         ctx = ctx,
         executable = ctx.executable._py_generator,
         mnemonic = "PyGeneration",
-        input_idls = input_idls,
-        input_type_descriptions = input_type_descriptions,
+        input_idls = [input_idls],
+        input_type_descriptions = [input_type_descriptions],
         input_templates = ctx.attr._py_templates[DefaultInfo].files.to_list(),
         templates_hdrs = ["_{}.py", "_{}.__init__.py"],
-        templates_srcs = ["_{}_s.c"],
+        templates_srcs = ["_{}_s.c", "_{}_s.ep.rosidl_typesupport_c.c"],
         additional = ["--typesupport-impls=rosidl_typesupport_c"],
+        debug = True,
     )
 
     # Unpack the generated python files - there are two files per message. One is the
@@ -48,16 +48,19 @@ def _py_aspect_impl(target, ctx):
     py_interface_file, py_init_file = py_files[0], py_files[1]
 
     # Collect the set of deps needed to build the C type support module.
-    deps = [dep[CcInfo] for dep in ctx.attr._cc_deps if CcInfo in dep]
-    deps.append(target[RosCBindingsInfo].cc_info)
+    cc_deps = [dep[CcInfo] for dep in ctx.attr._cc_deps if CcInfo in dep]
+    cc_deps.append(target[RosCTypesupportInfo].cc_info)
+    for dep in ctx.rule.attr.deps:
+        if RosPyBindingsInfo in dep:
+            cc_deps.extend(dep[RosPyBindingsInfo].cc_infos.to_list())
 
     # Merge sources and deps into a CcInfo provider.
     cc_info = generate_cc_info(
         ctx = ctx,
         name = "{}_py".format(ctx.label.name),
         hdrs = [],
-        srcs = srcs,
-        deps = deps,
+        srcs = cc_srcs,
+        deps = cc_deps,
         include_dirs = [],
     )
 
@@ -69,7 +72,7 @@ def _py_aspect_impl(target, ctx):
     # packages containing only those messages we'd need for an application.
     linking_outputs = generate_linking_outputs(
         ctx = ctx,
-        name = "{}__{}__{}".format(
+        name = "{}__{}__{}_s".format(
             target[RosIdlInfo].package_name,
             target[RosIdlInfo].interface_type,
             target[RosIdlInfo].interface_code,
@@ -81,6 +84,21 @@ def _py_aspect_impl(target, ctx):
     # available in the runfiles folder, so that it can be dynamically loaded.
     dynamic_library = linking_outputs.library_to_link.dynamic_library
 
+    # At runtime the library path will be mangled like the following:
+    #      _solib_k8/_Uexternal_Sfoo+_Smsg/libfoo__msg__bar_s.so 
+    # We must save this path so that we know where to look at runtime for the shared library.
+    py_rlocation_file = ctx.actions.declare_file(
+        "{}/{}/_{}__rlocation.py".format(
+            target[RosIdlInfo].package_name,
+            target[RosIdlInfo].interface_type,
+            target[RosIdlInfo].interface_code,
+        )
+    )
+    ctx.actions.write(
+        output = py_rlocation_file,
+        content = "TYPESUPPORT_C = '%s'" % dynamic_library.short_path
+    )
+
     # We need the import path relative to the runfiles root.
     import_path = paths.join(
         target.label.workspace_root.removeprefix("external/"),
@@ -91,8 +109,16 @@ def _py_aspect_impl(target, ctx):
     # aggregated by the rule and placed in the runfile path as needed.
     return [
         RosPyBindingsInfo(
+            cc_infos = depset(
+                direct = [cc_info],
+                transitive = [
+                    dep[RosPyBindingsInfo].cc_infos
+                    for dep in ctx.rule.attr.deps
+                    if RosPyBindingsInfo in dep
+                ]
+            ),
             transitive_sources = depset(
-                direct = [py_interface_file],
+                direct = [py_interface_file, py_rlocation_file],
                 transitive = [
                     dep[RosPyBindingsInfo].transitive_sources
                     for dep in ctx.rule.attr.deps
@@ -101,7 +127,7 @@ def _py_aspect_impl(target, ctx):
                     dep[PyInfo].transitive_sources
                     for dep in ctx.attr._py_deps
                     if PyInfo in dep
-                ]
+                ],
             ),
             imports = depset(
                 direct = [import_path],
@@ -113,7 +139,7 @@ def _py_aspect_impl(target, ctx):
                     dep[PyInfo].imports
                     for dep in ctx.attr._py_deps
                     if PyInfo in dep
-                ]
+                ],
             ),
             dynamic_libraries = depset(
                 direct = [dynamic_library],
@@ -156,7 +182,6 @@ py_aspect = aspect(
         ),
         "_py_deps": attr.label_list(
             default = [
-                Label("@rosidl_parser"),
                 Label("@rosidl_generator_py//:hook"),
             ],
             providers = [PyInfo],
@@ -166,7 +191,7 @@ py_aspect = aspect(
     required_aspect_providers = [
         [RosIdlInfo],
         [RosTypeDescriptionInfo],
-        [RosCBindingsInfo],
+        [RosCTypesupportInfo],
     ],
     provides = [RosPyBindingsInfo],
 )

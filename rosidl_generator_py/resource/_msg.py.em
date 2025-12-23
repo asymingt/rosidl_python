@@ -103,13 +103,15 @@ class Metaclass_@(message.structure.namespaced_type.name)(type):
 @[end for]@
     }
 @{
-suffix = '__'.join(message.structure.namespaced_type.namespaces[1:]) + '__' + convert_camel_case_to_lower_case_underscore(message.structure.namespaced_type.name)
+ifcode = convert_camel_case_to_lower_case_underscore(message.structure.namespaced_type.name)
+suffix = '__'.join(message.structure.namespaced_type.namespaces[1:]) + '__' + ifcode
 }@
     @@classmethod
     def __import_type_support__(cls):
         try:
             from rosidl_generator_py import import_type_support
-            module = import_type_support('@(package_name)__@(suffix)')
+            from ._@(ifcode)__rlocation import TYPESUPPORT_C
+            module = import_type_support('@(package_name)__@(suffix)_s__rosidl_typesupport_c', TYPESUPPORT_C)
         except ImportError:
             import logging
             import traceback

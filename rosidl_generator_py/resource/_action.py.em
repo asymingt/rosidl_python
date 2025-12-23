@@ -41,7 +41,8 @@ class Metaclass_@(action.namespaced_type.name)(type):
     def __import_type_support__(cls):
         try:
             from rosidl_generator_py import import_type_support
-            module = import_type_support('@(package_name)__action_@(action_name)')
+            from .@(action_name)__rlocation import TYPESUPPORT_C
+            module = import_type_support('@(package_name)__action_@(action_name)_s__rosidl_typesupport_c', TYPESUPPORT_C)
         except ImportError:
             import logging
             import traceback

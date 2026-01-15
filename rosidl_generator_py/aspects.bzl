@@ -22,7 +22,6 @@ load("@rules_python//python:defs.bzl", "PyInfo")
 load(":types.bzl", "RosPyBindingsInfo")
 
 def _rosidl_generator_py_aspect_impl(target, ctx):
-
     # Generate source files
     py_files, srcs, _ = generate_sources(
         target = target,
@@ -55,7 +54,7 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
             target[RosIdlInfo].package_name,
             target[RosIdlInfo].interface_type,
             target[RosIdlInfo].interface_code,
-        ),        
+        ),
         hdrs = [],
         srcs = srcs,
         deps = deps,
@@ -101,10 +100,6 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
                     dep[RosPyBindingsInfo].transitive_sources
                     for dep in ctx.rule.attr.deps
                     if RosPyBindingsInfo in dep
-                ] + [
-                    dep[PyInfo].transitive_sources
-                    for dep in ctx.attr._py_deps
-                    if PyInfo in dep
                 ],
             ),
             imports = depset(
@@ -113,10 +108,6 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
                     dep[RosPyBindingsInfo].imports
                     for dep in ctx.rule.attr.deps
                     if RosPyBindingsInfo in dep
-                ] + [
-                    dep[PyInfo].imports
-                    for dep in ctx.attr._py_deps
-                    if PyInfo in dep
                 ],
             ),
             dynamic_libraries = depset(
@@ -157,12 +148,6 @@ rosidl_generator_py_aspect = aspect(
                 Label("@rosidl_runtime_c"),
             ],
             providers = [CcInfo],
-        ),
-        "_py_deps": attr.label_list(
-            default = [
-                Label("@rosidl_generator_py//:hook"),
-            ],
-            providers = [PyInfo],
         ),
     },
     required_providers = [RosInterfaceInfo],

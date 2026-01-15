@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@rules_python//python:defs.bzl", "py_library", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -33,6 +33,7 @@ py_library(
     name = "rosidl_generator_py",
     srcs = glob(["rosidl_generator_py/**/*.py"]),
     deps = [
+        ":hook",
         "@ament_index_python",
         "@rosdistro//bazel/python:numpy",
         "@rosidl_cli",

@@ -4,19 +4,23 @@ from rosidl_pycommon import convert_camel_case_to_lower_case_underscore
 
 service_name = '_' + convert_camel_case_to_lower_case_underscore(service.namespaced_type.name)
 module_name = '_' + convert_camel_case_to_lower_case_underscore(interface_path.stem)
+import_suffix = 'srv_' + service_name
 
 TEMPLATE(
     '_msg.py.em',
     package_name=package_name, interface_path=interface_path,
-    message=service.request_message, import_statements=import_statements)
+    message=service.request_message, import_statements=import_statements,
+    import_suffix=import_suffix)
 TEMPLATE(
     '_msg.py.em',
     package_name=package_name, interface_path=interface_path,
-    message=service.response_message, import_statements=import_statements)
+    message=service.response_message, import_statements=import_statements,
+    import_suffix=import_suffix)
 TEMPLATE(
     '_msg.py.em',
     package_name=package_name, interface_path=interface_path,
-    message=service.event_message, import_statements=import_statements)
+    message=service.event_message, import_statements=import_statements,
+    import_suffix=import_suffix)
 }@
 
 
@@ -29,8 +33,7 @@ class Metaclass_@(service.namespaced_type.name)(type):
     def __import_type_support__(cls):
         try:
             from rosidl_generator_py import import_type_support
-            from .@(service_name)__rlocation import TYPESUPPORT_C
-            module = import_type_support('@(package_name)__srv_@(service_name)_s__rosidl_typesupport_c', TYPESUPPORT_C)
+            module = import_type_support('@(package_name)', '@(import_suffix)')
         except ImportError:
             import logging
             import traceback

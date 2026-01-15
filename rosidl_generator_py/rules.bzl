@@ -41,7 +41,7 @@ def _py_ros_library_rule_impl(ctx):
                         dep[RosPyBindingsInfo].dynamic_libraries
                         for dep in ctx.attr.deps
                         if RosPyBindingsInfo in dep
-                    ],
+                    ]
                 ),
             ),
         ),

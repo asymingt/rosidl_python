@@ -16,18 +16,18 @@ import importlib
 
 from rpyutils import add_dll_directories_from_env
 
-from python.runfiles import Runfiles
 
 class UnsupportedTypeSupport(Exception):
     """Raised when typesupport couldn't be imported."""
 
-    def __init__(self, pkg_name):
-        message = "Could not import 'rosidl_typesupport_c' for package '{0}'".format(pkg_name)
+    def __init__(self, pkg_name, interface_suffix):
+        message = "Could not import 'rosidl_typesupport_c' for '{}__{}'".format(
+            pkg_name, interface_suffix)
         super(UnsupportedTypeSupport, self).__init__(message)
         self.pkg_name = pkg_name
+        self.interface_suffix = interface_suffix
 
-
-def import_type_support(module_name, so_path):
+def import_type_support(pkg_name, interface_suffix):
     """
     Import the rosidl_typesupport_c module of a package.
 
@@ -38,16 +38,12 @@ def import_type_support(module_name, so_path):
     :param pkg_name str: name of the package
     :returns: the typesupport Python module for the specified package
     """
+    module_name = '.{}__{}_s__rosidl_typesupport_c'.format(pkg_name, interface_suffix)
     try:
         # Since Python 3.8, on Windows we should ensure DLL directories are explicitly added
         # to the search path.
         # See https://docs.python.org/3/whatsnew/3.8.html#bpo-36085-whatsnew
         with add_dll_directories_from_env('PATH'):
-            runfiles = Runfiles.Create()
-            rlocation_so = runfiles.Rlocation("_main/" + so_path)
-            spec = importlib.util.spec_from_file_location(module_name, so_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-        return module
+            return importlib.import_module(module_name, package=pkg_name)
     except ImportError:
-        raise UnsupportedTypeSupport(module_name)
+        raise UnsupportedTypeSupport(pkg_name, interface_suffix)

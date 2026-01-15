@@ -87,7 +87,6 @@ for member in message.structure.members:
 @[end if]@
 @#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-
 class Metaclass_@(message.structure.namespaced_type.name)(type):
     """Metaclass of message '@(message.structure.namespaced_type.name)'."""
 
@@ -105,13 +104,13 @@ class Metaclass_@(message.structure.namespaced_type.name)(type):
 @{
 ifcode = convert_camel_case_to_lower_case_underscore(message.structure.namespaced_type.name)
 suffix = '__'.join(message.structure.namespaced_type.namespaces[1:]) + '__' + ifcode
+import_suffix = locals().get('import_suffix', suffix)
 }@
     @@classmethod
     def __import_type_support__(cls):
         try:
             from rosidl_generator_py import import_type_support
-            from ._@(ifcode)__rlocation import TYPESUPPORT_C
-            module = import_type_support('@(package_name)__@(suffix)_s__rosidl_typesupport_c', TYPESUPPORT_C)
+            module = import_type_support('@(package_name)', '@(import_suffix)')
         except ImportError:
             import logging
             import traceback

@@ -18,32 +18,53 @@ load("@rosidl_cmake//:types.bzl", "RosInterfaceInfo")
 load("@rosidl_generator_c//:aspects.bzl", "rosidl_generator_c_aspect")
 load("@rosidl_generator_cpp//:aspects.bzl", "rosidl_generator_cpp_aspect")
 load("@rosidl_generator_type_description//:aspects.bzl", "rosidl_generator_type_description_aspect")
-load("@rosidl_typesupport_introspection_c//:aspects.bzl", "rosidl_typesupport_introspection_c_aspect")
-load("@rosidl_typesupport_introspection_c//:types.bzl", "RosCTypesupportIntrospectionInfo")
+load("@rosidl_typesupport_c//:aspects.bzl", "rosidl_typesupport_c_aspect")
+load("@rosidl_typesupport_c//:types.bzl", "RosCTypesupportInfo")
 load("@rosidl_typesupport_fastrtps_c//:aspects.bzl", "rosidl_typesupport_fastrtps_c_aspect")
 load("@rosidl_typesupport_fastrtps_c//:types.bzl", "RosCTypesupportFastRTPSInfo")
 load("@rosidl_typesupport_fastrtps_cpp//:aspects.bzl", "rosidl_typesupport_fastrtps_cpp_aspect")
 load("@rosidl_typesupport_fastrtps_cpp//:types.bzl", "RosCcTypesupportFastRTPSInfo")
+load("@rosidl_typesupport_introspection_c//:aspects.bzl", "rosidl_typesupport_introspection_c_aspect")
+load("@rosidl_typesupport_introspection_c//:types.bzl", "RosCTypesupportIntrospectionInfo")
 load("@rosidl_typesupport_protobuf_c//:aspects.bzl", "rosidl_typesupport_protobuf_c_aspect")
 load("@rosidl_typesupport_protobuf_c//:types.bzl", "RosCTypesupportProtobufInfo")
-load("@rosidl_typesupport_c//:aspects.bzl", "rosidl_typesupport_c_aspect")
-load("@rosidl_typesupport_c//:types.bzl", "RosCTypesupportInfo")
 load("@rules_python//python:defs.bzl", "PyInfo", "py_library")
 load(":aspects.bzl", "rosidl_generator_py_aspect")
 load(":types.bzl", "RosPyBindingsInfo")
 
+# We need to make sure the final libraries from these providers end up
+# in the runfiles, so that they can be loaded dynamically via dlopen()
+TYPESUPPORT_PROVIDERS = [
+    RosCTypesupportIntrospectionInfo,
+    RosCTypesupportFastRTPSInfo,
+    RosCTypesupportProtobufInfo,
+]
+
 def _py_ros_library_rule_impl(ctx):
+
+    # The python extensions must remain in their modules.
+    dynamic_libraries = depset(
+        transitive = [
+            dep[RosPyBindingsInfo].dynamic_libraries
+            for dep in ctx.attr.deps
+            if RosPyBindingsInfo in dep
+        ]
+    )
+
+    # The dlopen-able typesupports must end up in lib/ relative to the runfile path.
+    symlinks = {}
+    for dep in ctx.attr.deps:
+        for provider in TYPESUPPORT_PROVIDERS:
+            if provider in dep:
+                for file in dep[provider].dynamic_libraries.to_list():
+                    symlinks["lib" + "/" + file.basename] = file
+
     return [
         DefaultInfo(
             runfiles = ctx.runfiles(
-                transitive_files = depset(
-                    transitive = [
-                        dep[RosPyBindingsInfo].dynamic_libraries
-                        for dep in ctx.attr.deps
-                        if RosPyBindingsInfo in dep
-                    ]
-                ),
-            ),
+                files = symlinks.values() + dynamic_libraries.to_list(),
+                symlinks = symlinks
+            )
         ),
         PyInfo(
             imports = depset(

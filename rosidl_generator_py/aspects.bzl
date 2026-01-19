@@ -38,7 +38,7 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
 
     # Unpack the generated python files - there are two files per message. One is the
     # python interface, the other is the module initialization file (__init__.py).
-    py_interface_file, py_init_file = py_files[0], py_files[1]
+    py_interface_file, _ = py_files[0], py_files[1]
 
     # Collect the set of deps needed to build the C type support module.
     deps = [dep[CcInfo] for dep in ctx.attr._cc_deps if CcInfo in dep]
@@ -48,7 +48,7 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
             deps.extend(dep[RosPyBindingsInfo].cc_infos.to_list())
 
     # Assemble the CcInfo provider.
-    cc_info, dynamic_libraries = generate_compilation_information(
+    cc_info, dynamic_library = generate_compilation_information(
         ctx = ctx,
         name = "{}__{}__{}_s__rosidl_typesupport_c".format(
             target[RosIdlInfo].package_name,
@@ -59,11 +59,21 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
         srcs = srcs,
         deps = deps,
         include_dirs = [],
-        library_name = "{p}/{p}__{t}__{n}_s__rosidl_typesupport_c.so".format(
+    )
+
+    # The pybind11 system requires this extension to be named in a very specific
+    # way in order to be findable by the import system. So, we also need to
+    # include this as a symlink to the correct underlying library.
+    pybind11_symlink = ctx.actions.declare_file(
+        "{p}/{p}__{t}__{n}_s__rosidl_typesupport_c.so".format(
             p = target[RosIdlInfo].package_name,
             t = target[RosIdlInfo].interface_type,
             n = target[RosIdlInfo].interface_code,
         ),
+    )
+    ctx.actions.symlink(
+        output = pybind11_symlink,
+        target_file = dynamic_library,
     )
 
     # We need the import path relative to the runfiles root.
@@ -85,12 +95,12 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
                 ],
             ),
             transitive_sources = depset(
-                direct = [py_interface_file],
+                direct = [pybind11_symlink, py_interface_file],
                 transitive = [
                     dep[RosPyBindingsInfo].transitive_sources
                     for dep in ctx.rule.attr.deps
                     if RosPyBindingsInfo in dep
-                ]
+                ],
             ),
             imports = depset(
                 direct = [import_path],
@@ -101,7 +111,7 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
                 ],
             ),
             dynamic_libraries = depset(
-                direct = dynamic_libraries,
+                direct = [dynamic_library],
                 transitive = [
                     dep[RosPyBindingsInfo].dynamic_libraries
                     for dep in ctx.rule.attr.deps

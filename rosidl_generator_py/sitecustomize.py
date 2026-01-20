@@ -67,7 +67,7 @@ class InterceptingFinder(importlib.abc.MetaPathFinder):
     """Class to intercept module load calls in Python"""
 
     def find_spec(self, fullname, path, target=None):
-
+        
         # We only want to intercept module calls that end in specific package
         # names, which are likely to be requests for ROS messages.
         if fullname.endswith((".msg", ".srv", ".action")):

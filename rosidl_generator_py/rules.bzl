@@ -13,11 +13,13 @@
 # limitations under the License.
 
 load("@rosidl_adapter//:aspects.bzl", "rosidl_adapter_aspect")
+load("@rosidl_adapter//:tools.bzl", "unmangle_library_name")
 load("@rosidl_adapter_proto//:aspects.bzl", "rosidl_adapter_proto_aspect")
 load("@rosidl_cmake//:types.bzl", "RosInterfaceInfo")
 load("@rosidl_generator_c//:aspects.bzl", "rosidl_generator_c_aspect")
 load("@rosidl_generator_c//:types.bzl", "RosCBindingsInfo")
 load("@rosidl_generator_cpp//:aspects.bzl", "rosidl_generator_cpp_aspect")
+load("@rosidl_generator_cpp//:types.bzl", "RosCcBindingsInfo")
 load("@rosidl_generator_type_description//:aspects.bzl", "rosidl_generator_type_description_aspect")
 load("@rosidl_typesupport_c//:aspects.bzl", "rosidl_typesupport_c_aspect")
 load("@rosidl_typesupport_c//:types.bzl", "RosCTypesupportInfo")
@@ -36,28 +38,17 @@ load(":types.bzl", "RosPyBindingsInfo")
 # We need to make sure the final libraries from these providers end up
 # in the runfiles, so that they can be loaded dynamically via dlopen()
 TYPESUPPORT_PROVIDERS = [
-    RosCTypesupportInfo,
+    RosCBindingsInfo,
+    RosCcBindingsInfo,
+    RosCcTypesupportFastRTPSInfo,
     RosCTypesupportIntrospectionInfo,
     RosCTypesupportFastRTPSInfo,
     RosCTypesupportProtobufInfo,
+    RosCTypesupportInfo,
     RosPyBindingsInfo,
 ]
 
 def _py_ros_library_rule_impl(ctx):
-    # # The python extensions must remain in their modules.
-    # dynamic_libraries = depset(
-    #     transitive = [
-    #         dep[RosPyBindingsInfo].dynamic_libraries
-    #         for dep in ctx.attr.deps
-    #         if RosPyBindingsInfo in dep
-    #     ],
-    # )
-
-    # for dep in ctx.attr.deps:
-    #     if RosPyBindingsInfo in dep:
-    #         for file in dep[RosPyBindingsInfo].dynamic_libraries.to_list():
-    #             print(file)
-
     # The dlopen-able typesupports must end up in lib/ relative to the runfile path.
     # From the perspective of the typesupport system there exists a library with
     # name lib<package>___<type>)_<name>__<typesupport>.so (which is actually a
@@ -67,34 +58,34 @@ def _py_ros_library_rule_impl(ctx):
         for provider in TYPESUPPORT_PROVIDERS:
             if provider in dep:
                 for file in dep[provider].dynamic_libraries.to_list():
-                    unmangled = file.basename.replace("_S", "/").replace("_U", "_")
-                    unmangled = unmangled[unmangled.rfind('/') + 1:]
-                    symlinks["lib" + "/" + unmangled] = file
+                    unmangled_name = unmangle_library_name(file.basename)
+                    symlinks["lib/" + unmangled_name] = file
 
-    return [
-        DefaultInfo(
-            runfiles = ctx.runfiles(
-                files = symlinks.values(),
-                symlinks = symlinks,
-            ),
+    default_info = DefaultInfo(
+        runfiles = ctx.runfiles(
+            files = symlinks.values(),
+            symlinks = symlinks,
         ),
-        PyInfo(
-            imports = depset(
-                transitive = [
-                    dep[RosPyBindingsInfo].imports
-                    for dep in ctx.attr.deps
-                    if RosPyBindingsInfo in dep
-                ],
-            ),
-            transitive_sources = depset(
-                transitive = [
-                    dep[RosPyBindingsInfo].transitive_sources
-                    for dep in ctx.attr.deps
-                    if RosPyBindingsInfo in dep
-                ],
-            ),
+    )
+
+    py_info = PyInfo(
+        imports = depset(
+            transitive = [
+                dep[RosPyBindingsInfo].imports
+                for dep in ctx.attr.deps
+                if RosPyBindingsInfo in dep
+            ],
         ),
-    ]
+        transitive_sources = depset(
+            transitive = [
+                dep[RosPyBindingsInfo].transitive_sources
+                for dep in ctx.attr.deps
+                if RosPyBindingsInfo in dep
+            ],
+        ),
+    )
+
+    return [default_info, py_info]
 
 py_ros_library_rule = rule(
     implementation = _py_ros_library_rule_impl,

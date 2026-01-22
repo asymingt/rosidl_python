@@ -15,9 +15,9 @@
 RosPyBindingsInfo = provider(
     "Encapsulates Python modules generated for an underlying ROS message.",
     fields = [
-        "cc_infos",                 # CcInfo providers for the python bindings
-        "transitive_sources",       # generated .py interface code
-        "imports",                  # import path for generated code
-        "dynamic_libraries",        # shared libraries for c typesupport
+        "cc_info",  # CcInfo providers for the python bindings
+        "transitive_sources",  # generated .py interface code
+        "imports",  # import path for generated code
+        "dynamic_libraries",  # shared libraries for c typesupport
     ],
 )

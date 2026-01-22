@@ -34,11 +34,39 @@ import sys
 import importlib.abc
 import importlib.util
 
+INTERFACE_NAME_SUFFIXES = [
+    '_Constants',
+    '_Event',
+    '_Feedback',
+    '_FeedbackMessage',
+    '_GetResult',
+    '_Goal',
+    '_Request',
+    '_Response',
+    '_Result',
+    '_SendGoal',
+]
+
 def _convert_camel_case_to_lower_case_underscore(value: str) -> str:
     """Function to transform a capitalized message to a snake case message"""
     value = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', value)
     value = re.sub('([a-z0-9])([A-Z])', r'\1_\2', value)
     return value.lower()
+
+def _get_code_from_name(name):
+    code = name
+
+    # Optimization: only strip suffixes if we see an underscore in the name
+    if '_' in name:
+
+        # Allow for at most two laters of suffix, eg. _SendGoal_Result.
+        for suffix in INTERFACE_NAME_SUFFIXES:
+            code = code.removesuffix(suffix)
+        for suffix in INTERFACE_NAME_SUFFIXES:
+            code = code.removesuffix(suffix)
+
+    # This should now be the PEP-420 name of the python module.
+    return _convert_camel_case_to_lower_case_underscore(code)
 
 class NamespaceInterceptor(importlib.abc.Loader):
     """Class to handle and transform module load calls in Python"""
@@ -53,7 +81,7 @@ class NamespaceInterceptor(importlib.abc.Loader):
         module.__path__ = self.spec.submodule_search_locations
         module.__package__ = self.spec.name
         def __getattr__(name):
-            code = _convert_camel_case_to_lower_case_underscore(name)
+            code = _get_code_from_name(name)
             try:
                 target_submodule = f"{module.__name__}._{code}"
                 impl_mod = importlib.import_module(target_submodule)
@@ -67,7 +95,7 @@ class InterceptingFinder(importlib.abc.MetaPathFinder):
     """Class to intercept module load calls in Python"""
 
     def find_spec(self, fullname, path, target=None):
-        
+
         # We only want to intercept module calls that end in specific package
         # names, which are likely to be requests for ROS messages.
         if fullname.endswith((".msg", ".srv", ".action")):

@@ -16,8 +16,14 @@ load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@rosidl_adapter//:tools.bzl", "generate_compilation_information", "generate_sources")
 load("@rosidl_adapter//:types.bzl", "RosIdlInfo")
 load("@rosidl_cmake//:types.bzl", "RosInterfaceInfo")
+load("@rosidl_generator_c//:types.bzl", "RosCBindingsInfo")
+load("@rosidl_generator_cpp//:types.bzl", "RosCcBindingsInfo")
 load("@rosidl_generator_type_description//:types.bzl", "RosTypeDescriptionInfo")
 load("@rosidl_typesupport_c//:types.bzl", "RosCTypesupportInfo")
+load("@rosidl_typesupport_fastrtps_c//:types.bzl", "RosCTypesupportFastRTPSInfo")
+load("@rosidl_typesupport_fastrtps_cpp//:types.bzl", "RosCcTypesupportFastRTPSInfo")
+load("@rosidl_typesupport_introspection_c//:types.bzl", "RosCTypesupportIntrospectionInfo")
+load("@rosidl_typesupport_protobuf_c//:types.bzl", "RosCTypesupportProtobufInfo")
 load("@rules_python//python:defs.bzl", "PyInfo")
 load(":types.bzl", "RosPyBindingsInfo")
 
@@ -34,6 +40,7 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
         templates_hdrs = ["_{}.py", "_{}.__init__.py"],
         templates_srcs = ["_{}_s.c", "_{}_s.ep.rosidl_typesupport_c.c"],
         additional = ["--typesupport-impls=rosidl_typesupport_c"],
+        debug = True,
     )
 
     # Unpack the generated python files - there are two files per message. One is the
@@ -42,10 +49,16 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
 
     # Collect the set of deps needed to build the C type support module.
     deps = [dep[CcInfo] for dep in ctx.attr._cc_deps if CcInfo in dep]
+    deps.append(target[RosCBindingsInfo].cc_info)
+    deps.append(target[RosCcBindingsInfo].cc_info)
+    deps.append(target[RosCcTypesupportFastRTPSInfo].cc_info)
+    deps.append(target[RosCTypesupportFastRTPSInfo].cc_info)
+    deps.append(target[RosCTypesupportIntrospectionInfo].cc_info)
+    deps.append(target[RosCTypesupportProtobufInfo].cc_info)
     deps.append(target[RosCTypesupportInfo].cc_info)
     for dep in ctx.rule.attr.deps:
         if RosPyBindingsInfo in dep:
-            deps.extend(dep[RosPyBindingsInfo].cc_infos.to_list())
+            deps.append(dep[RosPyBindingsInfo].cc_info)
 
     # Assemble the CcInfo provider.
     cc_info, dynamic_library = generate_compilation_information(
@@ -61,21 +74,6 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
         include_dirs = [],
     )
 
-    # The pybind11 system requires this extension to be named in a very specific
-    # way in order to be findable by the import system. So, we also need to
-    # include this as a symlink to the correct underlying library.
-    pybind11_symlink = ctx.actions.declare_file(
-        "{p}/{p}__{t}__{n}_s__rosidl_typesupport_c.so".format(
-            p = target[RosIdlInfo].package_name,
-            t = target[RosIdlInfo].interface_type,
-            n = target[RosIdlInfo].interface_code,
-        ),
-    )
-    ctx.actions.symlink(
-        output = pybind11_symlink,
-        target_file = dynamic_library,
-    )
-
     # We need the import path relative to the runfiles root.
     import_path = paths.join(
         target.label.workspace_root.removeprefix("external/"),
@@ -86,16 +84,9 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
     # aggregated by the rule and placed in the runfile path as needed.
     return [
         RosPyBindingsInfo(
-            cc_infos = depset(
-                direct = [cc_info],
-                transitive = [
-                    dep[RosPyBindingsInfo].cc_infos
-                    for dep in ctx.rule.attr.deps
-                    if RosPyBindingsInfo in dep
-                ],
-            ),
+            cc_info = cc_info,
             transitive_sources = depset(
-                direct = [pybind11_symlink, py_interface_file],
+                direct = [py_interface_file],
                 transitive = [
                     dep[RosPyBindingsInfo].transitive_sources
                     for dep in ctx.rule.attr.deps
@@ -145,7 +136,6 @@ rosidl_generator_py_aspect = aspect(
         "_cc_deps": attr.label_list(
             default = [
                 Label("@rosdistro//bazel/python/cc:numpy_headers"),
-                Label("@rosidl_runtime_c"),
             ],
             providers = [CcInfo],
         ),
@@ -154,7 +144,14 @@ rosidl_generator_py_aspect = aspect(
     required_aspect_providers = [
         [RosIdlInfo],
         [RosTypeDescriptionInfo],
+        [RosCBindingsInfo],
+        [RosCcBindingsInfo],
+        [RosCcTypesupportFastRTPSInfo],
+        [RosCTypesupportIntrospectionInfo],
+        [RosCTypesupportFastRTPSInfo],
+        [RosCTypesupportProtobufInfo],
         [RosCTypesupportInfo],
+        [RosPyBindingsInfo],
     ],
     provides = [RosPyBindingsInfo],
 )

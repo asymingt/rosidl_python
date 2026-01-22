@@ -4,7 +4,7 @@ from rosidl_pycommon import convert_camel_case_to_lower_case_underscore
 
 service_name = '_' + convert_camel_case_to_lower_case_underscore(service.namespaced_type.name)
 module_name = '_' + convert_camel_case_to_lower_case_underscore(interface_path.stem)
-import_suffix = 'srv_' + service_name
+import_suffix = locals().get('import_suffix', 'srv_' + service_name)
 
 TEMPLATE(
     '_msg.py.em',

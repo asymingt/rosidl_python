@@ -35,37 +35,29 @@ load("@rules_python//python:defs.bzl", "PyInfo", "py_library")
 load(":aspects.bzl", "rosidl_generator_py_aspect")
 load(":types.bzl", "RosPyBindingsInfo")
 
-# We need to make sure the final libraries from these providers end up
-# in the runfiles, so that they can be loaded dynamically via dlopen()
-TYPESUPPORT_PROVIDERS = [
-    RosCBindingsInfo,
-    RosCcBindingsInfo,
-    RosCcTypesupportFastRTPSInfo,
-    RosCTypesupportIntrospectionInfo,
-    RosCTypesupportFastRTPSInfo,
-    RosCTypesupportProtobufInfo,
-    RosCTypesupportInfo,
-    RosPyBindingsInfo,
-]
 
 def _py_ros_library_rule_impl(ctx):
-    # The dlopen-able typesupports must end up in lib/ relative to the runfile path.
-    # From the perspective of the typesupport system there exists a library with
-    # name lib<package>___<type>)_<name>__<typesupport>.so (which is actually a
-    # symlink pointing to the underlying bazel-managed mangled name.
-    symlinks = {}
+    
+    transitive_dynamic_libraries = []
     for dep in ctx.attr.deps:
-        for provider in TYPESUPPORT_PROVIDERS:
-            if provider in dep:
-                for file in dep[provider].dynamic_libraries.to_list():
-                    unmangled_name = unmangle_library_name(file.basename)
-                    symlinks["lib/" + unmangled_name] = file
-
+        if RosPyBindingsInfo in dep:
+            for linker_input in dep[RosPyBindingsInfo].linker_inputs.to_list():
+                transitive_dynamic_libraries.extend([
+                    library.dynamic_library
+                    for library in linker_input.libraries
+                ])
+            transitive_dynamic_libraries.extend(
+                dep[RosPyBindingsInfo].dynamic_libraries.to_list()
+            )
+    
     default_info = DefaultInfo(
         runfiles = ctx.runfiles(
-            files = symlinks.values(),
-            symlinks = symlinks,
-        ),
+            transitive_files = depset(
+                transitive = [
+                    depset(transitive_dynamic_libraries),
+                ],
+            ),
+        )
     )
 
     py_info = PyInfo(

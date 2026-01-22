@@ -37,18 +37,15 @@ def import_type_support(pkg_name, interface_suffix):
     be converted to and from message structures used by the rmw implementation.
 
     :param pkg_name str: name of the package
+    :param interface_suffix str: <interface_type>__<interface_name> string
     :returns: the typesupport Python module for the specified package
     """
-    module_name = '{}__{}_s__rosidl_typesupport_c'.format(pkg_name, interface_suffix)
-    module_path = 'lib/lib{}.so'.format(module_name)
+    module_name = '.{}__{}_s__rosidl_typesupport_c'.format(pkg_name, interface_suffix)
     try:
         # Since Python 3.8, on Windows we should ensure DLL directories are explicitly added
         # to the search path.
         # See https://docs.python.org/3/whatsnew/3.8.html#bpo-36085-whatsnew
         with add_dll_directories_from_env('PATH'):
-            spec = importlib.util.spec_from_file_location(module_name, module_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            return module
+            return importlib.import_module(module_name, package=pkg_name)
     except ImportError:
         raise UnsupportedTypeSupport(pkg_name, interface_suffix)

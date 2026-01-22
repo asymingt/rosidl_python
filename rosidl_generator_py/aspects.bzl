@@ -80,13 +80,33 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
         target.label.package,
     )
 
+    # The pybind11 system requires this extension to be named in a very specific
+    # way in order to be findable by the import system. So, we also need to
+    # include this as a symlink to the correct underlying library.
+    pybind11_symlink = ctx.actions.declare_file(
+        "{p}/{p}__{t}__{n}_s__rosidl_typesupport_c.so".format(
+            p = target[RosIdlInfo].package_name,
+            t = target[RosIdlInfo].interface_type,
+            n = target[RosIdlInfo].interface_code,
+        )
+    )
+    ctx.actions.symlink(
+        output = pybind11_symlink,
+        target_file = dynamic_library,
+    )
+
     # Return the depset of python interfaces and extension modules. These will be
     # aggregated by the rule and placed in the runfile path as needed.
     return [
         RosPyBindingsInfo(
-            cc_info = cc_info,
+            cc_info = cc_common.merge_cc_infos(
+                direct_cc_infos = [cc_info] + [
+                    dep[RosPyBindingsInfo].cc_info
+                    for dep in ctx.rule.attr.deps
+                ]
+            ),
             transitive_sources = depset(
-                direct = [py_interface_file],
+                direct = [pybind11_symlink, py_interface_file],
                 transitive = [
                     dep[RosPyBindingsInfo].transitive_sources
                     for dep in ctx.rule.attr.deps
@@ -109,6 +129,7 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
                     if RosPyBindingsInfo in dep
                 ],
             ),
+            linker_inputs = cc_info.linking_context.linker_inputs
         ),
     ]
 

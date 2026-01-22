@@ -25,8 +25,8 @@ into ones that look like this:
 We need this functionality because the Python IDL generator uses namespace
 packages (PEP420) and therefore cannot put these remaps in __init__.py files.
 
-This works because all message packages depend on rosidl_parser, and so any
-code that relies on a message will have this injected into its context.
+This works because all message packages depend on rosidl_generator_py, and
+so any code that relies on a message will have this injected into its context.
 """
 
 import re

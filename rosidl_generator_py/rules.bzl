@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("@rosidl_adapter//:aspects.bzl", "rosidl_adapter_aspect")
-load("@rosidl_adapter//:tools.bzl", "unmangle_library_name")
+load("@rosidl_adapter//:tools.bzl", "extract_dynamic_library_runfiles_for_provider")
 load("@rosidl_adapter_proto//:aspects.bzl", "rosidl_adapter_proto_aspect")
 load("@rosidl_cmake//:types.bzl", "RosInterfaceInfo")
 load("@rosidl_generator_c//:aspects.bzl", "rosidl_generator_c_aspect")
@@ -35,31 +35,16 @@ load("@rules_python//python:defs.bzl", "PyInfo", "py_library")
 load(":aspects.bzl", "rosidl_generator_py_aspect")
 load(":types.bzl", "RosPyBindingsInfo")
 
+DYNAMIC_TYPESUPPORTS = [
+    RosCcTypesupportFastRTPSInfo,
+    RosCTypesupportFastRTPSInfo,
+    RosCTypesupportIntrospectionInfo,
+    RosCTypesupportProtobufInfo,
+    RosPyBindingsInfo,
+]
 
 def _py_ros_library_rule_impl(ctx):
-    
-    transitive_dynamic_libraries = []
-    for dep in ctx.attr.deps:
-        if RosPyBindingsInfo in dep:
-            for linker_input in dep[RosPyBindingsInfo].linker_inputs.to_list():
-                transitive_dynamic_libraries.extend([
-                    library.dynamic_library
-                    for library in linker_input.libraries
-                ])
-            transitive_dynamic_libraries.extend(
-                dep[RosPyBindingsInfo].dynamic_libraries.to_list()
-            )
-    
-    default_info = DefaultInfo(
-        runfiles = ctx.runfiles(
-            transitive_files = depset(
-                transitive = [
-                    depset(transitive_dynamic_libraries),
-                ],
-            ),
-        )
-    )
-
+    default_info = extract_dynamic_library_runfiles_for_provider(ctx, DYNAMIC_TYPESUPPORTS)
     py_info = PyInfo(
         imports = depset(
             transitive = [
@@ -76,7 +61,6 @@ def _py_ros_library_rule_impl(ctx):
             ],
         ),
     )
-
     return [default_info, py_info]
 
 py_ros_library_rule = rule(

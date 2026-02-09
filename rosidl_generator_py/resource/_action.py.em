@@ -10,32 +10,32 @@ TEMPLATE(
     '_msg.py.em',
     package_name=package_name, interface_path=interface_path,
     message=action.goal, import_statements=import_statements,
-    import_suffix=import_suffix)
+    import_ifcode=action_name, import_suffix=import_suffix)
 TEMPLATE(
     '_msg.py.em',
     package_name=package_name, interface_path=interface_path,
     message=action.result, import_statements=import_statements,
-    import_suffix=import_suffix)
+    import_ifcode=action_name, import_suffix=import_suffix)
 TEMPLATE(
     '_msg.py.em',
     package_name=package_name, interface_path=interface_path,
     message=action.feedback, import_statements=import_statements,
-    import_suffix=import_suffix)
+    import_ifcode=action_name, import_suffix=import_suffix)
 TEMPLATE(
     '_srv.py.em',
     package_name=package_name, interface_path=interface_path,
     service=action.send_goal_service, import_statements=import_statements,
-    import_suffix=import_suffix)
+    import_ifcode=action_name, import_suffix=import_suffix)
 TEMPLATE(
     '_srv.py.em',
     package_name=package_name, interface_path=interface_path,
     service=action.get_result_service, import_statements=import_statements,
-    import_suffix=import_suffix)
+    import_ifcode=action_name, import_suffix=import_suffix)
 TEMPLATE(
     '_msg.py.em',
     package_name=package_name, interface_path=interface_path,
     message=action.feedback_message, import_statements=import_statements,
-    import_suffix=import_suffix)
+    import_ifcode=action_name, import_suffix=import_suffix)
 }@
 
 
@@ -48,7 +48,7 @@ class Metaclass_@(action.namespaced_type.name)(type):
     def __import_type_support__(cls):
         try:
             from rosidl_generator_py import import_type_support
-            module = import_type_support('@(package_name)', '@(import_suffix)')
+            module = import_type_support('@(package_name)__action_@(action_name)_s__rosidl_typesupport_c')
         except ImportError:
             import logging
             import traceback

@@ -24,6 +24,8 @@ load("@rosidl_typesupport_fastrtps_c//:types.bzl", "RosCTypesupportFastRTPSInfo"
 load("@rosidl_typesupport_fastrtps_cpp//:types.bzl", "RosCcTypesupportFastRTPSInfo")
 load("@rosidl_typesupport_introspection_c//:types.bzl", "RosCTypesupportIntrospectionInfo")
 load("@rosidl_typesupport_protobuf_c//:types.bzl", "RosCTypesupportProtobufInfo")
+load("@rules_cc//cc:defs.bzl", "CcInfo", "cc_common")
+load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 load("@rules_python//python:defs.bzl", "PyInfo")
 load(":types.bzl", "RosPyBindingsInfo")
 
@@ -49,8 +51,6 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
 
     # Collect the set of deps needed to build the C type support module.
     deps = [dep[CcInfo] for dep in ctx.attr._cc_deps if CcInfo in dep]
-    deps.append(target[RosCBindingsInfo].cc_info)
-    deps.append(target[RosCcBindingsInfo].cc_info)
     deps.append(target[RosCcTypesupportFastRTPSInfo].cc_info)
     deps.append(target[RosCTypesupportFastRTPSInfo].cc_info)
     deps.append(target[RosCTypesupportIntrospectionInfo].cc_info)
@@ -63,10 +63,10 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
     # Assemble the CcInfo provider.
     cc_info, dynamic_library = generate_compilation_information(
         ctx = ctx,
-        name = "{}__{}__{}_s__rosidl_typesupport_c".format(
-            target[RosIdlInfo].package_name,
-            target[RosIdlInfo].interface_type,
-            target[RosIdlInfo].interface_code,
+        name = "{p}__{t}__{n}_s__rosidl_typesupport_c".format(
+            p = target[RosIdlInfo].package_name,
+            t = target[RosIdlInfo].interface_type,
+            n = target[RosIdlInfo].interface_code,
         ),
         hdrs = [],
         srcs = srcs,
@@ -80,33 +80,13 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
         target.label.package,
     )
 
-    # The pybind11 system requires this extension to be named in a very specific
-    # way in order to be findable by the import system. So, we also need to
-    # include this as a symlink to the correct underlying library.
-    pybind11_symlink = ctx.actions.declare_file(
-        "{p}/{p}__{t}__{n}_s__rosidl_typesupport_c.so".format(
-            p = target[RosIdlInfo].package_name,
-            t = target[RosIdlInfo].interface_type,
-            n = target[RosIdlInfo].interface_code,
-        )
-    )
-    ctx.actions.symlink(
-        output = pybind11_symlink,
-        target_file = dynamic_library,
-    )
-
     # Return the depset of python interfaces and extension modules. These will be
     # aggregated by the rule and placed in the runfile path as needed.
     return [
         RosPyBindingsInfo(
-            cc_info = cc_common.merge_cc_infos(
-                direct_cc_infos = [cc_info] + [
-                    dep[RosPyBindingsInfo].cc_info
-                    for dep in ctx.rule.attr.deps
-                ]
-            ),
+            cc_info = cc_info,
             transitive_sources = depset(
-                direct = [pybind11_symlink, py_interface_file],
+                direct = [py_interface_file],
                 transitive = [
                     dep[RosPyBindingsInfo].transitive_sources
                     for dep in ctx.rule.attr.deps

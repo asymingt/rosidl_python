@@ -45,6 +45,7 @@ INTERFACE_NAME_SUFFIXES = [
     '_Response',
     '_Result',
     '_SendGoal',
+    '.Constants',
 ]
 
 def _convert_camel_case_to_lower_case_underscore(value: str) -> str:

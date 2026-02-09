@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import importlib
+import os
 
 from rpyutils import add_dll_directories_from_env
 
@@ -21,14 +22,13 @@ from python.runfiles import Runfiles
 class UnsupportedTypeSupport(Exception):
     """Raised when typesupport couldn't be imported."""
 
-    def __init__(self, pkg_name, interface_suffix):
-        message = "Could not import 'rosidl_typesupport_c' for '{}__{}'".format(
-            pkg_name, interface_suffix)
+    def __init__(self, module_name):
+        message = "Could not import '{}'".format(
+            module_name)
         super(UnsupportedTypeSupport, self).__init__(message)
-        self.pkg_name = pkg_name
-        self.interface_suffix = interface_suffix
+        self.module_name = module_name
 
-def import_type_support(pkg_name, interface_suffix):
+def import_type_support(module_name):
     """
     Import the rosidl_typesupport_c module of a package.
 
@@ -36,16 +36,20 @@ def import_type_support(pkg_name, interface_suffix):
     specified package, such that the ROS message structures in the package can
     be converted to and from message structures used by the rmw implementation.
 
-    :param pkg_name str: name of the package
-    :param interface_suffix str: <interface_type>__<interface_name> string
+    :param module_name str: name of the module
     :returns: the typesupport Python module for the specified package
     """
-    module_name = '.{}__{}_s__rosidl_typesupport_c'.format(pkg_name, interface_suffix)
     try:
         # Since Python 3.8, on Windows we should ensure DLL directories are explicitly added
         # to the search path.
         # See https://docs.python.org/3/whatsnew/3.8.html#bpo-36085-whatsnew
         with add_dll_directories_from_env('PATH'):
-            return importlib.import_module(module_name, package=pkg_name)
+            runfiles = Runfiles.Create()
+            so_path = runfiles.Rlocation(f"_main/lib{module_name}.so")
+            so_path = os.path.realpath(so_path)
+            spec = importlib.util.spec_from_file_location(module_name, so_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module
     except ImportError:
-        raise UnsupportedTypeSupport(pkg_name, interface_suffix)
+        raise UnsupportedTypeSupport(module_name)

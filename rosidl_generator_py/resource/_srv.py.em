@@ -10,17 +10,17 @@ TEMPLATE(
     '_msg.py.em',
     package_name=package_name, interface_path=interface_path,
     message=service.request_message, import_statements=import_statements,
-    import_suffix=import_suffix)
+    import_ifcode=service_name, import_suffix=import_suffix)
 TEMPLATE(
     '_msg.py.em',
     package_name=package_name, interface_path=interface_path,
     message=service.response_message, import_statements=import_statements,
-    import_suffix=import_suffix)
+    import_ifcode=service_name, import_suffix=import_suffix)
 TEMPLATE(
     '_msg.py.em',
     package_name=package_name, interface_path=interface_path,
     message=service.event_message, import_statements=import_statements,
-    import_suffix=import_suffix)
+    import_ifcode=service_name, import_suffix=import_suffix)
 }@
 
 
@@ -33,7 +33,7 @@ class Metaclass_@(service.namespaced_type.name)(type):
     def __import_type_support__(cls):
         try:
             from rosidl_generator_py import import_type_support
-            module = import_type_support('@(package_name)', '@(import_suffix)')
+            module = import_type_support('@(package_name)__@(import_suffix)_s__rosidl_typesupport_c')
         except ImportError:
             import logging
             import traceback

@@ -46,6 +46,12 @@ def import_type_support(module_name):
         with add_dll_directories_from_env('PATH'):
             runfiles = Runfiles.Create()
             so_path = runfiles.Rlocation(f"_main/lib{module_name}.so")
+            # Resolve symlinks so that $ORIGIN in the ELF RUNPATH entries
+            # resolves to the real build output directory (where _solib_k8
+            # is reachable via the relative RUNPATH). This is needed because
+            # in the runfiles tree, .so files may be symlinks, and $ORIGIN
+            # would otherwise resolve to the runfiles directory where the
+            # relative path to _solib_k8 is different.
             so_path = os.path.realpath(so_path)
             spec = importlib.util.spec_from_file_location(module_name, so_path)
             module = importlib.util.module_from_spec(spec)

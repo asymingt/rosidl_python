@@ -72,7 +72,6 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
         srcs = srcs,
         deps = deps,
         include_dirs = [],
-        link_deps_statically = True,
     )
 
     # We need the import path relative to the runfiles root.

@@ -76,7 +76,8 @@ def _rosidl_generator_py_aspect_impl(target, ctx):
     if target.label.workspace_root:
         import_path = paths.join(
             target.label.workspace_root.removeprefix("external/"),
-            target.label.package)
+            target.label.package,
+        )
     else:
         import_path = paths.join("_main", target.label.package)
 
